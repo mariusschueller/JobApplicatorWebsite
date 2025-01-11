@@ -5,7 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Resume and Job Application Manager</title>
-
+<style>
+    body{
+        font-family: sans-serif;
+    }
+</style>
 </head>
 
 <body>
@@ -23,17 +27,10 @@
     <button onclick="showExperienceDetails()">Show Experience Details</button>
     <button onclick="addExperienceDetail()">Add Experience Detail</button>
 
-
-
     <!-- Job Application -->
     <h2>Job Application</h2>
     <button onclick="editJobApplication()">Add Job Application</button>
     <button onclick="showJobApplication()">Show Job Application</button>
-
-    <!-- AI Section -->
-    <!-- <h2>Generate AI Content</h2>
-    <button onclick="generateAIContent()">Generate AI Bullet Points</button>
-    <div id="bulletPointsArea" style="margin-top: 20px;"></div> -->
 
     <!-- Generate Keywords -->
     <!-- <button onclick="generateKeywords()">Generate Keywords</button> -->
@@ -313,15 +310,14 @@
 
         function showJobApplication() {
             displayArea.innerHTML = `<h2>Job Application</h2>
-                <p><strong>Title:</strong> ${jobData.title}</p>
-                <p><strong>Company:</strong> ${jobData.company}</p>
-                <p><strong>Description:</strong></p>
-                <pre>${jobData.description}</pre>`;
+            <p><strong>Title:</strong> ${jobData.title}</p>
+            <p><strong>Company:</strong> ${jobData.company}</p>
+            <p><strong>Description:</strong></p>
+            <pre style="white-space: pre-wrap;">${jobData.description}</pre>`;
         }
 
         /* -------- AI BULLET POINT GENERATION -------- */
         async function generateAIContent(system, user) {
-
             const response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: {
@@ -329,7 +325,7 @@
                     Authorization: `Bearer ${OPENAI_API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: "gpt-4o-mini",
+                    model: "gpt-4o",
                     messages: [
                         { role: "system", content: system },
                         { role: "user", content: user }
@@ -567,34 +563,35 @@ ${data.name}`;
                 console.error('Error calling Flask API:', error);
             }
         }
-
+        let missingKeywords = [];
         function showKeywords() {
             const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
-            const bulletPoints = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
-            const allBulletPoints = bulletPoints.flatMap(detail => detail.bulletPoints);
+            const professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+            const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
+            const allBulletPoints = [...professionalDetails.flatMap(detail => detail.bulletPoints), ...experienceDetails.flatMap(detail => detail.bulletPoints)];
 
             let foundKeywords = [];
-            let missingKeywords = [...keywords.keywords];
+            missingKeywords = [...keywords.keywords];
 
             allBulletPoints.forEach(bullet => {
-                keywords.keywords.forEach(keyword => {
-                    if (bullet.includes(keyword) && !foundKeywords.includes(keyword)) {
-                        foundKeywords.push(keyword);
-                        missingKeywords = missingKeywords.filter(k => k !== keyword);
-                    }
-                });
+            keywords.keywords.forEach(keyword => {
+                if (bullet.toLowerCase().includes(keyword.toLowerCase()) && !foundKeywords.includes(keyword)) {
+                foundKeywords.push(keyword);
+                missingKeywords = missingKeywords.filter(k => k.toLowerCase() !== keyword.toLowerCase());
+                }
+            });
             });
 
             let html = "<h2>Extracted Keywords</h2>";
             html += "<h3>Found Keywords</h3><ul>";
             foundKeywords.forEach((keyword) => {
-                html += `<li>${keyword} <button onclick="deleteKeyword('${keyword}')">Delete</button></li>`;
+            html += `<li>${keyword} <button onclick="deleteKeyword('${keyword}')">Delete</button></li>`;
             });
             html += "</ul>";
 
             html += "<h3>Missing Keywords</h3><ul>";
             missingKeywords.forEach((keyword) => {
-                html += `<li>${keyword} <button onclick="deleteKeyword('${keyword}')">Delete</button></li>`;
+            html += `<li>${keyword} <button onclick="deleteKeyword('${keyword}')">Delete</button></li>`;
             });
             html += "</ul>";
 
@@ -603,7 +600,7 @@ ${data.name}`;
 
         function deleteKeyword(keyword) {
             const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
-            keywords.keywords = keywords.keywords.filter(k => k !== keyword);
+            keywords.keywords = keywords.keywords.filter(k => k.toLowerCase() !== keyword.toLowerCase());
             localStorage.setItem("extractedKeywords", JSON.stringify(keywords));
             showKeywords();
         }
@@ -618,57 +615,57 @@ ${data.name}`;
             const amounts = [3, 5]; // specify the number of experiences for professional and experience details
 
             for (let i = 0; i < types.length; i++) {
-                const type = types[i];
-                const amount = amounts[i];
-                let allExperiences = "";
-                const allDetails = type === "professionalDetails" ? professionalDetails : experienceDetails;
+            const type = types[i];
+            const amount = amounts[i];
+            let allExperiences = "";
+            const allDetails = type === "professionalDetails" ? professionalDetails : experienceDetails;
 
-                for (const detail of allDetails) {
-                    const bestBulletPoints = await decideBestBulletPoints(detail.bulletPoints);
-                    detail.bulletPoints = bestBulletPoints;
-                }
+            for (const detail of allDetails) {
+                const bestBulletPoints = await decideBestBulletPoints(detail.bulletPoints);
+                detail.bulletPoints = bestBulletPoints;
+            }
 
-                allDetails.forEach((detail, index) => {
-                    allExperiences += `${index + 1}: ${detail.title}. ${detail.bulletPoints.join(". ")}. \n`;
-                });
+            allDetails.forEach((detail, index) => {
+                allExperiences += `${index + 1}: ${detail.title}. ${detail.bulletPoints.join(". ")}. \n`;
+            });
 
-                const systemPrompt = `I'm going to give you a list of numbered experiences for a resume. I want you to give me the numbers and just the numbers of the ${amount} most relevant experience details.`;
-                const userPrompt = `Job description: ${jobData.description}\nExperiences: ${allExperiences}`;
+            const systemPrompt = `I'm going to give you a list of numbered experiences for a resume. I want you to give me the numbers and just the numbers of the ${amount} most relevant experience details.`;
+            const userPrompt = `Job description: ${jobData.description}\nExperiences: ${allExperiences}`;
 
-                try {
-                    const response = await generateAIContent(systemPrompt, userPrompt);
-                    const experienceNums = response.split(',').map(num => parseInt(num.trim()) - 1);
+            try {
+                const response = await generateAIContent(systemPrompt, userPrompt);
+                const experienceNums = response.split(',').map(num => parseInt(num.trim()) - 1);
 
-                    const relevantExperiences = experienceNums.map(num => allDetails[num]);
-                    console.log("Using experiences", relevantExperiences);
+                const relevantExperiences = experienceNums.map(num => allDetails[num]);
+                console.log("Using experiences", relevantExperiences);
 
-                    // Save relevant experiences to local storage
-                    localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(relevantExperiences));
-                } catch (error) {
-                    console.error("Error deciding experiences:", error);
-                }
+                // Save relevant experiences to local storage
+                localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(relevantExperiences));
+            } catch (error) {
+                console.error("Error deciding experiences:", error);
+            }
             }
             showAIExperiences();
         }
         async function decideBestBulletPoints(bulletPoints) {
             if (bulletPoints.length <= 3) {
-                return bulletPoints;
+            return bulletPoints;
             }
 
             const systemPrompt = "I'm going to give you a list of numbered bullet points for a resume. I want you to give me the numbers and just the numbers of the 3 most relevant bullet points separated by commas. Say \"1, 2\" if there are only 2 bullet points.";
             const userPrompt = `Description: ${jobData.description}\nBullet Points: ${bulletPoints.map((b, i) => `${i + 1}: ${b}`).join("\n")}`;
 
             try {
-                const response = await generateAIContent(systemPrompt, userPrompt);
-                const bulletNums = response.split(',').map(num => parseInt(num.trim()) - 1);
+            const response = await generateAIContent(systemPrompt, userPrompt);
+            const bulletNums = response.split(',').map(num => parseInt(num.trim()) - 1);
 
-                const relevantBullets = bulletNums.map(num => bulletPoints[num]);
-                console.log("Using bullets", relevantBullets);
+            const relevantBullets = bulletNums.map(num => bulletPoints[num]);
+            console.log("Using bullets", relevantBullets);
 
-                return relevantBullets;
+            return relevantBullets;
             } catch (error) {
-                console.error("Error deciding best bullet points:", error);
-                return bulletPoints.slice(0, 3); // Fallback to the first 3 bullet points
+            console.error("Error deciding best bullet points:", error);
+            return bulletPoints.slice(0, 3); // Fallback to the first 3 bullet points
             }
         }
 
@@ -680,39 +677,55 @@ ${data.name}`;
             let html = "";
 
             const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
-            const allBulletPoints = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails"))?.flatMap(detail => detail.bulletPoints) || [];
+            const professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+            const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
+            const allBulletPoints = [...professionalDetails.flatMap(detail => detail.bulletPoints), ...experienceDetails.flatMap(detail => detail.bulletPoints)];
+
             const foundKeywords = [];
-            let missingKeywords = [...keywords.keywords];
+            missingKeywords = [...keywords.keywords];
 
             allBulletPoints.forEach(bullet => {
-                keywords.keywords.forEach(keyword => {
-                    if (bullet.includes(keyword) && !foundKeywords.includes(keyword)) {
-                        foundKeywords.push(keyword);
-                        missingKeywords = missingKeywords.filter(k => k !== keyword);
-                    }
-                });
+            keywords.keywords.forEach(keyword => {
+            if (bullet.toLowerCase().includes(keyword.toLowerCase()) && !foundKeywords.includes(keyword)) {
+            foundKeywords.push(keyword);
+            missingKeywords = missingKeywords.filter(k => k.toLowerCase() !== keyword.toLowerCase());
+            }
+            });
             });
 
             html += `<h2>Missing Keywords</h2><p>${missingKeywords.join(", ")}</p>`;
 
             for (let i = 0; i < types.length; i++) {
-                const type = types[i];
-                const amount = amounts[i];
-                let experiences = JSON.parse(localStorage.getItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`)) || [];
+            const type = types[i];
+            const amount = amounts[i];
+            let experiences = JSON.parse(localStorage.getItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`)) || [];
 
-                html += `<h2>AI Selected ${type === "professionalDetails" ? "Professional" : "Experience"} Details</h2>`;
-                experiences.forEach((detail, index) => {
-                    html += `<div>
+            html += `<h2>AI Selected ${type === "professionalDetails" ? "Professional" : "Experience"} Details</h2>`;
+            experiences.forEach((detail, index) => {
+            html += `<div>
             <h3>${detail.title}</h3>
             <p><strong>Dates:</strong> ${detail.dates}</p>
             <p><strong>Location:</strong> ${detail.location}</p>
             <p><strong>Role:</strong> ${detail.role}</p>
-            <ul>${detail.bulletPoints.map((b, i) => `<li>${b} <button onclick="rewriteBulletPoint('${type}', ${index}, ${i})">Rewrite</button></li>`).join("")}</ul>
+            <ul>${detail.bulletPoints.map((b, i) => `<li>${b} <button onclick="rewriteBulletPoint('${type}', ${index}, ${i})">Rewrite</button> <button onclick="editBulletPoint('${type}', ${index}, ${i})">Edit</button> (${b.length})</li>`).join("")}</ul>
             </div>`;
-                });
+            });
             }
 
             displayArea.innerHTML = html;
+        }
+
+        function editBulletPoint(type, detailIndex, bulletIndex) {
+            const allDetails = JSON.parse(localStorage.getItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`)) || [];
+            const detail = allDetails[detailIndex];
+            const bulletPoint = detail.bulletPoints[bulletIndex];
+
+            const newBulletPoint = prompt("Edit Bullet Point:", bulletPoint);
+            if (newBulletPoint !== null) {
+            detail.bulletPoints[bulletIndex] = newBulletPoint;
+            localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
+            showAIExperiences();
+            }
         }
 
         async function rewriteBulletPoint(type, detailIndex, bulletIndex) {
@@ -721,12 +734,20 @@ ${data.name}`;
             const bulletPoint = detail.bulletPoints[bulletIndex];
 
             const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
-            const missingKeywords = keywords.keywords.filter(keyword => !bulletPoint.includes(keyword));
-
-            const systemPrompt = "You are a job application assistant used for resumes. You will be given keywords. Your job is to take the given bullet points and rewrite the bullet point to include keywords if and only if you can add a relevant keyword. If no keywords are relevant, give back the sentence as is. The amount of characters should be around 140 but not higher.";
+            
+            const systemPrompt = "You are a job application assistant used for resumes. You will be given keywords. Your job is to take the given bullet point and rewrite it to include relevant keywords. The amount of characters is required to be less than 150";
             const userPrompt = `Keywords: ${missingKeywords.join(", ")}\nBullet Point: ${bulletPoint}\n`;
 
-            const newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
+            console.log(userPrompt);
+            let newBulletPoint;
+            do {
+                newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
+                if (newBulletPoint.length > 150) {
+                    systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this job application to be shorter by one word";
+                } else if (newBulletPoint.length < 120) {
+                    systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this job application to be longer by one word";
+                }
+            } while (newBulletPoint.length > 150 || newBulletPoint.length < 120);
 
             detail.bulletPoints[bulletIndex] = newBulletPoint;
             localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
@@ -737,11 +758,11 @@ ${data.name}`;
         /* -------- EXPORT AND IMPORT LOCAL STORAGE -------- */
         function exportLocalStorage() {
             const data = {
-                applicantData: localStorage.getItem("applicantData"),
-                professionalDetails: localStorage.getItem("professionalDetails"),
-                experienceDetails: localStorage.getItem("experienceDetails"),
-                jobApplication: localStorage.getItem("jobApplication"),
-                extractedKeywords: localStorage.getItem("extractedKeywords")
+            applicantData: localStorage.getItem("applicantData"),
+            professionalDetails: localStorage.getItem("professionalDetails"),
+            experienceDetails: localStorage.getItem("experienceDetails"),
+            jobApplication: localStorage.getItem("jobApplication"),
+            extractedKeywords: localStorage.getItem("extractedKeywords")
             };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
             const downloadAnchorNode = document.createElement('a');
@@ -756,18 +777,17 @@ ${data.name}`;
             const file = event.target.files[0];
             const reader = new FileReader();
             reader.onload = function (event) {
-                const data = JSON.parse(event.target.result);
-                localStorage.setItem("applicantData", data.applicantData);
-                localStorage.setItem("professionalDetails", data.professionalDetails);
-                localStorage.setItem("experienceDetails", data.experienceDetails);
-                localStorage.setItem("jobApplication", data.jobApplication);
-                localStorage.setItem("extractedKeywords", data.extractedKeywords);
-                alert("Local storage data imported successfully!");
-                location.reload(); // Refresh the page to reflect the imported data
+            const data = JSON.parse(event.target.result);
+            localStorage.setItem("applicantData", data.applicantData);
+            localStorage.setItem("professionalDetails", data.professionalDetails);
+            localStorage.setItem("experienceDetails", data.experienceDetails);
+            localStorage.setItem("jobApplication", data.jobApplication);
+            localStorage.setItem("extractedKeywords", data.extractedKeywords);
+            alert("Local storage data imported successfully!");
+            location.reload(); // Refresh the page to reflect the imported data
             };
             reader.readAsText(file);
         }
-
 
     </script>
 
