@@ -7,11 +7,7 @@
     <title>AI Job Application Helper</title>
     <link rel="stylesheet" href="index.css">
 
-    <style>
-        body {
-            font-family: sans-serif;
-        }
-    </style>
+    
 </head>
 
 <body>
@@ -34,13 +30,17 @@
     <button onclick="editJobApplication()">Add Job Application</button>
     <button onclick="showJobApplication()">Show Job Application</button>
 
+    <button onclick="allInOne()">Customize Resume</button>
+
     <!-- Generate Keywords -->
     <!-- <button onclick="generateKeywords()">Generate Keywords</button> -->
     <!-- <button onclick="decideExperiences()">Get AI Content</button> -->
     <!-- <button onclick="showKeywords()">Show Keywords</button> -->
-    <!-- <button onclick="showAIExperiences()">Show AI Content</button> -->
+    <button onclick="showAIExperiences(false)">Show AI Content</button>
+    <button onclick="generateResume()">Get Resume</button>
+    <button onclick="generateCoverLetter()">Get Cover Letter</button>
 
-    <!-- Generate Resume -->
+    <!-- Generate Resume --> 
     <!-- <button onclick="generateResume()">Generate Resume</button> -->
 
     <!-- Cover Letter -->
@@ -54,7 +54,7 @@
 
     <!-- Display Area -->
     <div id="displayArea" style="margin-top: 20px; font-family: sans-serif;">
-        <h4 style="text-align: center;">Click on the buttons to apply to jobs!</h4>
+        <h4 style="text-align: center;">Happy Applying!</h4>
     </div>
 
     <script>
@@ -139,6 +139,7 @@
                     if (response.toLowerCase() === 'yes' || response.toLowerCase() === 'yes.') {
                         validKeywords.push(keyword);
                         console.log("Adding keyword:", keyword);
+                        displayArea.innerHTML = `<p>${validKeywords.length} found</p>` + displayArea.innerHTML;
                     }
                     else {
                         console.log("Not adding keyword:", keyword);
@@ -167,7 +168,8 @@
             const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
             const allBulletPoints = [...professionalDetails.flatMap(detail => detail.bulletPoints), ...experienceDetails.flatMap(detail => detail.bulletPoints)];
 
-            let foundKeywords = [];
+            const foundKeywords = [];
+            console.log(keywords)
             missingKeywords = [...keywords.keywords];
 
             allBulletPoints.forEach(bullet => {
@@ -178,6 +180,7 @@
                     }
                 });
             });
+            getMissingKeywords();
 
             let html = "<h2>Extracted Keywords</h2>";
             html += "<h3>Found Keywords</h3><ul>";
@@ -193,6 +196,7 @@
             html += "</ul>";
 
             displayArea.innerHTML = html;
+            displayArea.innerHTML = `<button onclick="continueAllInOne()">Continue</button>` + displayArea.innerHTML;
         }
 
         function deleteKeyword(keyword) {
@@ -206,7 +210,7 @@
         async function decideExperiences() {
             console.log("deciding experiences...");
 
-            await generateKeywords(); // Generate keywords before deciding experiences
+            //await generateKeywords(); // Generate keywords before deciding experiences
 
             const types = ["professionalDetails", "experienceDetails"];
             const amounts = [4, 4]; // specify the number of experiences for professional and experience details
@@ -244,10 +248,10 @@
                     console.error("Error deciding experiences:", error);
                 }
             }
-            showKeywords();
+            //showKeywords();
         }
 
-        async function showAIExperiences() {
+        async function showAIExperiences(static = true, done = false) {
             const displayArea = document.getElementById("displayArea");
             const types = ["professionalDetails", "experienceDetails"];
             const amounts = [3, 5]; // specify the number of experiences for professional and experience details
@@ -270,9 +274,9 @@
                     }
                 });
             });
-            // html += `<button onclick="addKeywordsBulletPoints()">Keywords to Bullet Points</button> `
-            // html += `<button onclick="rewriteLeftoverBulletPoints()">Rewrite Leftover Bullet Points</button>`
-            html += `<h2>Missing Keywords</h2><p>${missingKeywords.join(", ")}</p>`;
+            // html += `<button onclick="generateResume()">Get Resume</button> `
+            // html += `<button onclick="generateCoverLetter()">Get Cover Letter</button>`
+            // html += `<h2>Missing Keywords</h2><p>${missingKeywords.join(", ")}</p>`;
 
             for (let i = 0; i < types.length; i++) {
                 const type = types[i];
@@ -286,12 +290,40 @@
             <p><strong>Dates:</strong> ${detail.dates}</p>
             <p><strong>Location:</strong> ${detail.location}</p>
             <p><strong>Role:</strong> ${detail.role}</p>
-            <ul>${detail.bulletPoints.map((b, i) => `<li>${b} <button onclick="rewriteBulletPoint('${type}', ${index}, ${i})">Rewrite</button> <button onclick="editBulletPoint('${type}', ${index}, ${i})">Edit</button> (${b.length})</li>`).join("")}</ul>
+            <ul>${detail.bulletPoints.map((b, i) => `<li>${b}${static ? "" : ` <button onclick="rewriteBulletPoint('${type}', ${index}, ${i})">AI Rewrite</button> <button onclick="editBulletPoint('${type}', ${index}, ${i})">Edit</button> (${b.length})`}</li>`).join("")}</ul>
             </div>`;
                 });
             }
+            
 
             displayArea.innerHTML = html;
+            if (done) {
+                displayArea.innerHTML = `<button onclick="generateResume()">Get Resume</button> `+ displayArea.innerHTML;
+                displayArea.innerHTML = `<button onclick="generateCoverLetter()">Get Cover Letter</button>` + displayArea.innerHTML;
+            }
+        }
+
+        async function allInOne() {
+            displayArea.innerHTML = "<h2>Finding Keywords in Job Description...</h2>";
+            await generateKeywords();
+            displayArea.innerHTML = "<h2>Loading Experiences...</h2>";
+            await decideExperiences();
+            showKeywords();
+            
+            // FIXME should probably give user a chance to review keywords
+            // displayArea.innerHTML = `<button onclick="continueAllInOne()">Continue</button>` + displayArea.innerHTML;
+
+           
+        }
+        async function continueAllInOne() {
+            displayArea.innerHTML = "<h2>Adding Keywords Bullet Points...</h2>";
+            await addKeywordsBulletPoints();
+
+            displayArea.innerHTML = "<h2>Rewritting Leftover Bullet Points...</h2>" + displayArea.innerHTML;
+            await rewriteLeftoverBulletPoints();
+            showAIExperiences(false);
+            displayArea.innerHTML = `<button onclick="generateResume()">Get Resume</button> `+ displayArea.innerHTML;
+            displayArea.innerHTML = `<button onclick="generateCoverLetter()">Get Cover Letter</button>` + displayArea.innerHTML;
         }
 
     </script>

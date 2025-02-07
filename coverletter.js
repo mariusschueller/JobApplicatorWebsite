@@ -50,6 +50,8 @@ async function meCoverLetter() {
 
 
 async function generateCoverLetter() {
+    displayArea.innerHTML = `<h2>Generating Cover Letter...</h2>`
+    
     const preletter = `${data.name}
 ${data.phone}
 ${data.email}
@@ -70,11 +72,9 @@ Dear Hiring Team,
     const postParagragh = `Cheers,
 ${data.name}`;
     const coverLetter = `${preletter}${intro} \n\n${meParagraph} \n\n${comParagraph} \n\n${passionParagraph} \n\n${postParagragh}`;
-    const newTab = window.open();
-    if (newTab) {
-        newTab.document.write(`<pre style="text-wrap: wrap;">${coverLetter}`);
-        newTab.document.close();
-    } else {
-        displayArea.innerHTML = `<pre style="text-wrap: wrap;">${coverLetter}</pre>`;
-    }
+    
+    displayArea.innerHTML = `<button onclick="showAIExperiences(false, true)">Show Generated</button> `
+    displayArea.innerHTML += `<button onclick="generateResume()">Get Resume</button> <br><br>`
+    displayArea.innerHTML += `<pre style="text-wrap: wrap;">${coverLetter}</pre>`;
+    
 }

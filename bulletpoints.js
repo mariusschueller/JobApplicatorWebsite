@@ -24,6 +24,7 @@ async function rewriteLeftoverBulletPoints() {
     const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
     const allDetails = [...professionalDetails, ...experienceDetails];
     const rewriteTasks = [];
+    let rewrittenCount = 0;
 
     for (let detailIndex = 0; detailIndex < allDetails.length; detailIndex++) {
         const detail = allDetails[detailIndex];
@@ -48,19 +49,21 @@ async function rewriteLeftoverBulletPoints() {
                             const wordsToAdd = Math.ceil(belowTarget / 5);
                             systemPrompt = `You are a job application assistant used for resumes. Rewrite this bullet to be longer by ${wordsToAdd} word(s)`;
                         }
-                        
+
                         const userPrompt = `Bullet Point: ${newBulletPoint}`;
                         newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
 
                         if (newBulletPoint.endsWith(".")) newBulletPoint = newBulletPoint.slice(0, -1);
                         if (newBulletPoint.startsWith("Bullet Point: ")) newBulletPoint = newBulletPoint.slice(14);
                         if (newBulletPoint.startsWith("- ")) newBulletPoint = newBulletPoint.slice(2);
-                        
+
                         count++;
                     } while ((newBulletPoint.length > 150 || newBulletPoint.length < 130) && count < 50);
 
                     if (newBulletPoint.length >= 130 && newBulletPoint.length <= 150) {
                         detail.bulletPoints[bulletIndex] = newBulletPoint;
+                        rewrittenCount++;
+                        displayArea.innerHTML = `<p>${rewrittenCount} bullet points rewritten</p>` + displayArea.innerHTML;
                     }
                     console.log(count + " Rewritten bullet point!");
                 })());
@@ -71,13 +74,36 @@ async function rewriteLeftoverBulletPoints() {
     await Promise.all(rewriteTasks);
     localStorage.setItem("aiSelectedProfessionalDetails", JSON.stringify(professionalDetails));
     localStorage.setItem("aiSelectedExperienceDetails", JSON.stringify(experienceDetails));
-    showAIExperiences();
+    //showAIExperiences();
     console.log("All bullet points rewritten successfully!");
     alert("All bullet points rewritten successfully!");
 }
 
+missingKeywords = [];
+function getMissingKeywords() {
+    const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
+    professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+    experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
+    const allBulletPoints = [...professionalDetails.flatMap(detail => detail.bulletPoints), ...experienceDetails.flatMap(detail => detail.bulletPoints)];
+
+    let foundKeywords = [];
+    missingKeywords = [...keywords.keywords];
+
+    allBulletPoints.forEach(bullet => {
+        keywords.keywords.forEach(keyword => {
+            if (bullet.toLowerCase().includes(keyword.toLowerCase()) && !foundKeywords.includes(keyword)) {
+                foundKeywords.push(keyword);
+                missingKeywords = missingKeywords.filter(k => k.toLowerCase() !== keyword.toLowerCase());
+            }
+        });
+    });
+}
+
 async function addKeywordsBulletPoints() {
+    getMissingKeywords();
     while (missingKeywords.length > 0) {
+        displayArea.innerHTML = "<p>" + missingKeywords.length + " keywords left to add </p>" + displayArea.innerHTML;
+        console.log("Missing Keywords:", missingKeywords);
         const professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
         const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
         const allDetails = [...professionalDetails, ...experienceDetails];
@@ -132,8 +158,9 @@ async function addKeywordsBulletPoints() {
         console.log(`Original Bullet Point: ${bestBullet}`);
         console.log(`Selected Keywords: ${selectedKeywords.join(", ")}`);
 
-        
+
         await autoBulletRewrite(bestBullet, selectedKeywords);
+        getMissingKeywords();
     }
     console.log("All keywords added!");
     alert("All keywords added!");
@@ -210,8 +237,9 @@ async function autoBulletRewrite(originalBullet, keywordsToAdd) {
             }
         }
     }
+    
     console.log(count + " tries. Success! " + newBulletPoint);
-    showAIExperiences();
+    //showAIExperiences();
 }
 
 
@@ -225,7 +253,7 @@ function editBulletPoint(type, detailIndex, bulletIndex) {
     if (newBulletPoint !== null) {
         detail.bulletPoints[bulletIndex] = newBulletPoint;
         localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
-        showAIExperiences();
+        //showAIExperiences();
     }
 }
 
@@ -273,5 +301,5 @@ async function rewriteBulletPoint(type, detailIndex, bulletIndex) {
 
     detail.bulletPoints[bulletIndex] = newBulletPoint;
     localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
-    showAIExperiences();
+    //showAIExperiences();
 }
