@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Job Application Manager</title>
+    <title>AI Job Application Helper</title>
+    <link rel="stylesheet" href="index.css">
+
     <style>
         body {
             font-family: sans-serif;
@@ -13,7 +15,7 @@
 </head>
 
 <body>
-    <h1>AI Job Application Manager</h1>
+    <h1>AI Job Application Helper</h1>
 
     <!-- Personal Information -->
     <button onclick="showPersonalDetails()">Show Personal Info</button>
@@ -34,24 +36,26 @@
 
     <!-- Generate Keywords -->
     <!-- <button onclick="generateKeywords()">Generate Keywords</button> -->
-    <button onclick="decideExperiences()">Get AI Content</button>
-    <button onclick="showKeywords()">Show Keywords</button>
-    <button onclick="showAIExperiences()">Show AI Content</button>
+    <!-- <button onclick="decideExperiences()">Get AI Content</button> -->
+    <!-- <button onclick="showKeywords()">Show Keywords</button> -->
+    <!-- <button onclick="showAIExperiences()">Show AI Content</button> -->
 
     <!-- Generate Resume -->
-    <button onclick="generateResume()">Generate Resume</button>
+    <!-- <button onclick="generateResume()">Generate Resume</button> -->
 
     <!-- Cover Letter -->
-    <button onclick="generateCoverLetter()">Generate Cover Letter</button>
+    <!-- <button onclick="generateCoverLetter()">Generate Cover Letter</button> -->
 
     <!-- Local Storage Export and Import -->
     <h2>Storage</h2>
-    <button onclick="exportLocalStorage()">Export Local Storage</button>
+    <button onclick="exportLocalStorage()">Export Info</button>
     <input type="file" id="importFile" style="display:none" onchange="importLocalStorage(event)">
-    <button onclick="document.getElementById('importFile').click()">Import Local Storage</button>
+    <button onclick="document.getElementById('importFile').click()">Import Info</button>
 
     <!-- Display Area -->
-    <div id="displayArea" style="margin-top: 20px; font-family: Arial, sans-serif;"></div>
+    <div id="displayArea" style="margin-top: 20px; font-family: sans-serif;">
+        <h4 style="text-align: center;">Click on the buttons to apply to jobs!</h4>
+    </div>
 
     <script>
         const OPENAI_API_KEY = ""; // Replace with your OpenAI key
@@ -266,8 +270,8 @@
                     }
                 });
             });
-            html += `<button onclick="addKeywordsBulletPoints()">Keywords to Bullet Points</button> `
-            html += `<button onclick="rewriteLeftoverBulletPoints()">Rewrite Leftover Bullet Points</button>`
+            // html += `<button onclick="addKeywordsBulletPoints()">Keywords to Bullet Points</button> `
+            // html += `<button onclick="rewriteLeftoverBulletPoints()">Rewrite Leftover Bullet Points</button>`
             html += `<h2>Missing Keywords</h2><p>${missingKeywords.join(", ")}</p>`;
 
             for (let i = 0; i < types.length; i++) {
