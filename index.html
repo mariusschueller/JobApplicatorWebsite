@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resume and Job Application Manager</title>
+    <title>AI Job Application Manager</title>
     <style>
         body {
             font-family: sans-serif;
@@ -13,7 +13,7 @@
 </head>
 
 <body>
-    <h1>Resume and Job Application Manager</h1>
+    <h1>AI Job Application Manager</h1>
 
     <!-- Personal Information -->
     <button onclick="showPersonalDetails()">Show Personal Info</button>
@@ -125,6 +125,25 @@
                 }
 
                 const keywords = await response.json();
+
+                let systemPrompt = `I'm going to give you a keyword from a job description. Give yes if it's a good keyword to add to a resume. Otherwise, no. Let add cs languages and technologies to the list of keywords.`;
+                let validKeywords = [];
+
+                for (const keyword of keywords.keywords) {
+                    const response = await generateAIContent(systemPrompt, `Keyword: ${keyword}`);
+                    console.log(`Keyword: ${keyword}, Response: ${response}`);
+                    if (response.toLowerCase() === 'yes' || response.toLowerCase() === 'yes.') {
+                        validKeywords.push(keyword);
+                        console.log("Adding keyword:", keyword);
+                    }
+                    else {
+                        console.log("Not adding keyword:", keyword);
+                    }
+                }
+
+                keywords.keywords = validKeywords;
+                
+
                 console.log('Extracted Keywords:', keywords); // Display extracted keywords
 
                 // Save keywords to local storage
@@ -186,7 +205,7 @@
             await generateKeywords(); // Generate keywords before deciding experiences
 
             const types = ["professionalDetails", "experienceDetails"];
-            const amounts = [3, 5]; // specify the number of experiences for professional and experience details
+            const amounts = [4, 4]; // specify the number of experiences for professional and experience details
 
             for (let i = 0; i < types.length; i++) {
                 const type = types[i];
@@ -205,12 +224,14 @@
 
                 const systemPrompt = `I'm going to give you a list of numbered experiences for a resume. I want you to give me the numbers and just the numbers of the ${amount} most relevant experience details.`;
                 const userPrompt = `Job description: ${jobData.description}\nExperiences: ${allExperiences}`;
-
+                console.log("System Prompt:", userPrompt);
                 try {
                     const response = await generateAIContent(systemPrompt, userPrompt);
+                    
                     const experienceNums = response.split(',').map(num => parseInt(num.trim()) - 1);
 
                     const relevantExperiences = experienceNums.map(num => allDetails[num]);
+                    console.log("Response:", response);
                     console.log("Using experiences", relevantExperiences);
 
                     // Save relevant experiences to local storage
@@ -219,7 +240,7 @@
                     console.error("Error deciding experiences:", error);
                 }
             }
-            showAIExperiences();
+            showKeywords();
         }
 
         async function showAIExperiences() {
@@ -246,7 +267,7 @@
                 });
             });
             html += `<button onclick="addKeywordsBulletPoints()">Keywords to Bullet Points</button> `
-            html += `<button onclick="rewriteAllBulletPoints()">Rewrite All Bullet Points</button>`
+            html += `<button onclick="rewriteLeftoverBulletPoints()">Rewrite Leftover Bullet Points</button>`
             html += `<h2>Missing Keywords</h2><p>${missingKeywords.join(", ")}</p>`;
 
             for (let i = 0; i < types.length; i++) {

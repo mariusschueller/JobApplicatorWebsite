@@ -19,101 +19,164 @@ async function decideBestBulletPoints(bulletPoints) {
         return bulletPoints.slice(0, 3); // Fallback to the first 3 bullet points
     }
 }
-
-async function addKeywordsBulletPoints() {
+async function rewriteLeftoverBulletPoints() {
     const professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
     const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
     const allDetails = [...professionalDetails, ...experienceDetails];
+    const rewriteTasks = [];
 
-    let bulletPoints = [];
-    allDetails.forEach((detail, detailIndex) => {
-        detail.bulletPoints.forEach((bullet, bulletIndex) => {
-            bulletPoints.push({ detailIndex, bulletIndex, bullet });
-        });
-    });
+    for (let detailIndex = 0; detailIndex < allDetails.length; detailIndex++) {
+        const detail = allDetails[detailIndex];
+        for (let bulletIndex = 0; bulletIndex < detail.bulletPoints.length; bulletIndex++) {
+            let bullet = detail.bulletPoints[bulletIndex];
+            if (bullet.length < 130 || bullet.length > 150) {
+                rewriteTasks.push((async () => {
+                    console.log("Rewriting bullet point:", bullet);
+                    let newBulletPoint = bullet;
+                    let count = 0;
+                    let systemPrompt = "You are a job application assistant used for resumes. Fix the bullet to 130-150 characters.";
 
+                    do {
+                        if (newBulletPoint.length > 150) {
+                            console.log("TOO LONG", newBulletPoint.length);
+                            const overshoot = newBulletPoint.length - 140;
+                            const wordsToRemove = Math.ceil(overshoot / 5);
+                            systemPrompt = `You are a job application assistant used for resumes. Rewrite this bullet to be shorter by ${wordsToRemove} word(s)`;
+                        } else if (newBulletPoint.length < 130) {
+                            console.log("TOO SHORT", newBulletPoint.length);
+                            const belowTarget = 140 - newBulletPoint.length;
+                            const wordsToAdd = Math.ceil(belowTarget / 5);
+                            systemPrompt = `You are a job application assistant used for resumes. Rewrite this bullet to be longer by ${wordsToAdd} word(s)`;
+                        }
+                        
+                        const userPrompt = `Bullet Point: ${newBulletPoint}`;
+                        newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
+
+                        if (newBulletPoint.endsWith(".")) newBulletPoint = newBulletPoint.slice(0, -1);
+                        if (newBulletPoint.startsWith("Bullet Point: ")) newBulletPoint = newBulletPoint.slice(14);
+                        if (newBulletPoint.startsWith("- ")) newBulletPoint = newBulletPoint.slice(2);
+                        
+                        count++;
+                    } while ((newBulletPoint.length > 150 || newBulletPoint.length < 130) && count < 50);
+
+                    if (newBulletPoint.length >= 130 && newBulletPoint.length <= 150) {
+                        detail.bulletPoints[bulletIndex] = newBulletPoint;
+                    }
+                    console.log(count + " Rewritten bullet point!");
+                })());
+            }
+        }
+    }
+
+    await Promise.all(rewriteTasks);
+    localStorage.setItem("aiSelectedProfessionalDetails", JSON.stringify(professionalDetails));
+    localStorage.setItem("aiSelectedExperienceDetails", JSON.stringify(experienceDetails));
+    showAIExperiences();
+    console.log("All bullet points rewritten successfully!");
+    alert("All bullet points rewritten successfully!");
+}
+
+async function addKeywordsBulletPoints() {
     while (missingKeywords.length > 0) {
-        const { detailIndex, bulletIndex, bullet } = bulletPoints[i];
-        const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
+        const professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+        const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
+        const allDetails = [...professionalDetails, ...experienceDetails];
 
-        const systemPrompt = "You are a job application assistant used for resumes. You will be given a list of bullet points and keywords. Identify the number of the best bullet point to use and which keywords to add to that bullet point in the format 0:keyword1, keyword2. Do not include the bullet point text.";
+        let bulletPoints = [];
+        allDetails.forEach((detail, detailIndex) => {
+            detail.bulletPoints.forEach((bullet, bulletIndex) => {
+                if (bullet.length < 130 || bullet.length > 150) {
+                    bulletPoints.push({ detailIndex, bulletIndex, bullet });
+                }
+            });
+        });
+
+        keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
+
+        const systemPrompt = "You are a job application assistant used for resumes. You will be given a list of bullet points and keywords. Identify the number of the best bullet point to use and which keywords to add to that bullet point in the format 0:keyword1, keyword2. Do not include the bullet point text. Find at least 1 keyword to match to a bullet point.";
         const userPrompt = `Bullet Points: ${bulletPoints.map((bp, index) => `${index}: ${bp.bullet}`).join("\n")}\nKeywords: ${missingKeywords.join(", ")}`;
-        console.log(userPrompt);
-        const response = await generateAIContent(systemPrompt, userPrompt);
-        console.log(response);
-        const lines = response.split('\n').map(line => line.trim()).filter(Boolean);
-        const [indexStr, bulletContent] = lines[0].split(':');
-        const bestBulletIndex = parseInt(indexStr.trim());
-        const bestBullet = bulletPoints[bestBulletIndex].bullet;
+
+        let bestBulletIndex, bestBullet, bulletContent;
+        let validFormat = false;
+        let count = 0;
+
+        while (!validFormat) {
+            const response = await generateAIContent(systemPrompt, userPrompt);
+            const lines = response.split('\n').map(line => line.trim()).filter(Boolean);
+
+            if (lines.length > 0 && lines[0].includes(':')) {
+                const [indexStr, content] = lines[0].split(':');
+                const potentialIndex = parseInt(indexStr.trim());
+                if (!isNaN(potentialIndex) && potentialIndex >= 0 && potentialIndex < bulletPoints.length) {
+                    bestBulletIndex = potentialIndex;
+                    bulletContent = content;
+                    bestBullet = bulletPoints[bestBulletIndex].bullet;
+                    validFormat = true;
+                } else {
+                    console.log("Regenerating matches");
+                }
+            }
+            count++;
+            if (count > 50) {
+                alert("An error occured, unable to match keywords to bullet points");
+            }
+        }
 
         let selectedKeywords = [];
         if (bulletContent) {
             selectedKeywords = bulletContent.split(',').map(k => k.trim());
         }
         const newBulletPoint = `${bestBullet} (${selectedKeywords.join(", ")})`;
+        console.log(newBulletPoint);
         console.log(`Bullet Point Index: ${bestBulletIndex}`);
         console.log(`Original Bullet Point: ${bestBullet}`);
         console.log(`Selected Keywords: ${selectedKeywords.join(", ")}`);
+
         
-        // now call the bullet point logic to add selected keywords to the selected bullet point (get new bullet point) 
-        // Do this with new function autoBulletRewrite
-        // bullet point gets 5 tries before being reset, and that happens 5 times
-        // save the bullet point, check the keyword list to see if any weren't used 
-        // for any that weren't used, remove the keyword, or maybe use another call to get the used version of that keyword, or maybe stem and lemmetize???
-        // save the updated list of keywords and bullet points
-
-        // repeat the above until there are no more keywords left
-
-        // the below uses the detail index
-        if (detailIndex < professionalDetails.length) {
-             professionalDetails[detailIndex].bulletPoints[bulletIndex] = newBulletPoint;
-         } else {
-             experienceDetails[detailIndex - professionalDetails.length].bulletPoints[bulletIndex] = newBulletPoint;
-         }
-    
-
-    //localStorage.setItem("aiSelectedProfessionalDetails", JSON.stringify(professionalDetails));
-    //localStorage.setItem("aiSelectedExperienceDetails", JSON.stringify(experienceDetails));
-    //showAIExperiences();
+        await autoBulletRewrite(bestBullet, selectedKeywords);
+    }
+    console.log("All keywords added!");
+    alert("All keywords added!");
 }
 
-// NOTE THAT detailIndex MIGHT BE DIFFERENT THEN ADD KEYWORDSBULLETPOINTS
-async function autoBulletRewrite(type, detailIndex, bulletIndex, keywordsToAdd) {
-    const allDetails = JSON.parse(localStorage.getItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`)) || [];
-    const detail = allDetails[detailIndex];
-    const bulletPoint = detail.bulletPoints[bulletIndex];
 
-    
-    
-
-    console.log(userPrompt);
+async function autoBulletRewrite(originalBullet, keywordsToAdd) {
     let newBulletPoint;
     let count = 0;
-    
+
     do {
-    let systemPrompt = "You are a job application assistant used for resumes. You will be given keywords. Your job is to take the given bullet point and rewrite it to include relevant keywords. The amount of characters is required to be less than 150";
-    let userPrompt = `Keywords: ${keywordsToAdd.join(", ")}\nBullet Point: ${bulletPoint}\n`;
-    do {
-        newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
-        console.log("generating new bullet point...");
-        if (newBulletPoint.length > 175) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be shorter by one word";
-        }
-        else if (newBulletPoint.length < 110) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer";
-        }
-        else if (newBulletPoint.length < 130) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer by one word";
-        } else if (newBulletPoint.length > 150) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be shorter";
-        }
-        userPrompt = `Keywords: ${missingKeywords.join(", ")}\nBullet Point: ${newBulletPoint}\n`;
-        count++;
-    } while (count%5 < 5 && (newBulletPoint.length > 150 || newBulletPoint.length < 130));
-}while(count < 50)
-if (newBulletPoint.length > 150 || newBulletPoint.length < 130){
-    alert("failed to generate bullet point in over 50 attemps");
-}
+        let systemPrompt = "You are a job application assistant used for resumes. You will be given keywords. Your job is to take the given bullet point and rewrite it to include relevant keywords.";
+        let userPrompt = `Keywords: ${keywordsToAdd.join(", ")}\nBullet Point: ${originalBullet}\n`;
+        // console.log(userPrompt);
+        do {
+            count++;
+            if (count % 5 == 0) {
+                break;
+            }
+            console.log("generating new bullet point...");
+            newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
+
+            if (newBulletPoint.length > 150) {
+                const overshoot = newBulletPoint.length - 140;
+                const wordsToRemove = Math.ceil(overshoot / 5);
+                console.log("TOO LONG " + newBulletPoint.length);
+                systemPrompt = `You are a job application assistant used for resumes. You need to rewrite this bullet point to be shorter by ${wordsToRemove} word(s)`;
+            } else if (newBulletPoint.length < 130) {
+                console.log("TOO SHORT " + newBulletPoint.length);
+                const belowTarget = 140 - newBulletPoint.length;
+                const wordsToAdd = Math.ceil(belowTarget / 5);
+                systemPrompt = `You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer by ${wordsToAdd} word(s)`;
+            }
+            // console.log(systemPrompt);
+            userPrompt = `Keywords: ${keywordsToAdd.join(", ")}\nBullet Point: ${newBulletPoint}\n`;
+
+
+        } while (newBulletPoint.length > 150 || newBulletPoint.length < 130);
+    } while (count < 50 && (newBulletPoint.length > 150 || newBulletPoint.length < 130))
+    if (newBulletPoint.length > 150 || newBulletPoint.length < 130) {
+        alert("Error, please try again");
+        return;
+    }
 
     if (newBulletPoint.endsWith(".")) {
         newBulletPoint = newBulletPoint.slice(0, -1);
@@ -121,11 +184,37 @@ if (newBulletPoint.length > 150 || newBulletPoint.length < 130){
     if (newBulletPoint.startsWith("Bullet Point: ")) {
         newBulletPoint = newBulletPoint.slice(14);
     }
-    detail.bulletPoints[bulletIndex] = newBulletPoint;
-    localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
+    if (newBulletPoint.startsWith("- ")) {
+        newBulletPoint = newBulletPoint.slice(2);
+    }
+
+    let professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+
+    let type;
+    if (professionalDetails.some(detail => detail.bulletPoints.includes(originalBullet))) {
+        type = "professional";
+    } else {
+        type = "experience";
+    }
+
+    let storageKey = type === "professional" ? "aiSelectedProfessionalDetails" : "aiSelectedExperienceDetails";
+    let storedDetails = JSON.parse(localStorage.getItem(storageKey)) || [];
+
+    outer:
+    for (let i = 0; i < storedDetails.length; i++) {
+        for (let j = 0; j < storedDetails[i].bulletPoints.length; j++) {
+            if (storedDetails[i].bulletPoints[j] === originalBullet) {
+                storedDetails[i].bulletPoints[j] = newBulletPoint;
+                localStorage.setItem(storageKey, JSON.stringify(storedDetails));
+                break outer;
+            }
+        }
+    }
+    console.log(count + " tries. Success! " + newBulletPoint);
     showAIExperiences();
 }
-}
+
+
 
 function editBulletPoint(type, detailIndex, bulletIndex) {
     const allDetails = JSON.parse(localStorage.getItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`)) || [];
@@ -145,27 +234,25 @@ async function rewriteBulletPoint(type, detailIndex, bulletIndex) {
     const detail = allDetails[detailIndex];
     const bulletPoint = detail.bulletPoints[bulletIndex];
 
-    const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
-
     let systemPrompt = "You are a job application assistant used for resumes. You will be given keywords. Your job is to take the given bullet point and rewrite it to include relevant keywords. The amount of characters is required to be less than 150";
     let userPrompt = `Keywords: ${missingKeywords.join(", ")}\nBullet Point: ${bulletPoint}\n`;
 
-    console.log(userPrompt);
+    // console.log(userPrompt);
     let newBulletPoint;
     let count = 0;
     do {
         newBulletPoint = await generateAIContent(systemPrompt, userPrompt);
         console.log("generating new bullet point...");
-        if (newBulletPoint.length > 175) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be shorter by one word";
-        }
-        else if (newBulletPoint.length < 110) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer";
-        }
-        else if (newBulletPoint.length < 130) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer by one word";
-        } else if (newBulletPoint.length > 150) {
-            systemPrompt = "You are a job application assistant used for resumes. You need to rewrite this bullet point to be shorter";
+        if (newBulletPoint.length > 150) {
+            const overshoot = newBulletPoint.length - 140;
+            const wordsToRemove = Math.ceil(overshoot / 5);
+            console.log("TOO LONG " + newBulletPoint.length);
+            systemPrompt = `You are a job application assistant used for resumes. You need to rewrite this bullet point to be shorter by ${wordsToRemove} word(s)`;
+        } else if (newBulletPoint.length < 130) {
+            console.log("TOO SHORT " + newBulletPoint.length);
+            const belowTarget = 140 - newBulletPoint.length;
+            const wordsToAdd = Math.ceil(belowTarget / 5);
+            systemPrompt = `You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer by ${wordsToAdd} word(s)`;
         }
         userPrompt = `Keywords: ${missingKeywords.join(", ")}\nBullet Point: ${newBulletPoint}\n`;
         count++;
@@ -180,6 +267,10 @@ async function rewriteBulletPoint(type, detailIndex, bulletIndex) {
     if (newBulletPoint.startsWith("Bullet Point: ")) {
         newBulletPoint = newBulletPoint.slice(14);
     }
+    if (newBulletPoint.startsWith("- ")) {
+        newBulletPoint = newBulletPoint.slice(2);
+    }
+
     detail.bulletPoints[bulletIndex] = newBulletPoint;
     localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
     showAIExperiences();
