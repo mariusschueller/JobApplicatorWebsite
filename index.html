@@ -212,6 +212,8 @@
 
             //await generateKeywords(); // Generate keywords before deciding experiences
 
+            let professionalDetails = JSON.parse(localStorage.getItem("professionalDetails")) || [];
+            let experienceDetails = JSON.parse(localStorage.getItem("experienceDetails")) || [];
             const types = ["professionalDetails", "experienceDetails"];
             const amounts = [4, 4]; // specify the number of experiences for professional and experience details
 

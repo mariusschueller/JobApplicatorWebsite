@@ -82,9 +82,9 @@ async function rewriteLeftoverBulletPoints() {
 missingKeywords = [];
 function getMissingKeywords() {
     const keywords = JSON.parse(localStorage.getItem("extractedKeywords")) || { keywords: [] };
-    professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
-    experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
-    const allBulletPoints = [...professionalDetails.flatMap(detail => detail.bulletPoints), ...experienceDetails.flatMap(detail => detail.bulletPoints)];
+    professionalDetailsAI = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+    experienceDetailsAI = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
+    const allBulletPoints = [...professionalDetailsAI.flatMap(detail => detail.bulletPoints), ...experienceDetails.flatMap(detail => detail.bulletPoints)];
 
     let foundKeywords = [];
     missingKeywords = [...keywords.keywords];
@@ -104,12 +104,12 @@ async function addKeywordsBulletPoints() {
     while (missingKeywords.length > 0) {
         displayArea.innerHTML = "<p>" + missingKeywords.length + " keywords left to add </p>" + displayArea.innerHTML;
         console.log("Missing Keywords:", missingKeywords);
-        const professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
-        const experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
-        const allDetails = [...professionalDetails, ...experienceDetails];
+        let professionalDetailsAI = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+        let experienceDetailsAI = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
+        let allDetailsAI = [...professionalDetailsAI, ...experienceDetailsAI];
 
         let bulletPoints = [];
-        allDetails.forEach((detail, detailIndex) => {
+        allDetailsAI.forEach((detail, detailIndex) => {
             detail.bulletPoints.forEach((bullet, bulletIndex) => {
                 if (bullet.length < 130 || bullet.length > 150) {
                     bulletPoints.push({ detailIndex, bulletIndex, bullet });
@@ -144,7 +144,8 @@ async function addKeywordsBulletPoints() {
             }
             count++;
             if (count > 50) {
-                alert("An error occured, unable to match keywords to bullet points");
+                alert("An error occurred, unable to match keywords to bullet points");
+                return;
             }
         }
 
@@ -158,14 +159,12 @@ async function addKeywordsBulletPoints() {
         console.log(`Original Bullet Point: ${bestBullet}`);
         console.log(`Selected Keywords: ${selectedKeywords.join(", ")}`);
 
-
         await autoBulletRewrite(bestBullet, selectedKeywords);
         getMissingKeywords();
     }
     console.log("All keywords added!");
     alert("All keywords added!");
 }
-
 
 async function autoBulletRewrite(originalBullet, keywordsToAdd) {
     let newBulletPoint;
@@ -174,7 +173,6 @@ async function autoBulletRewrite(originalBullet, keywordsToAdd) {
     do {
         let systemPrompt = "You are a job application assistant used for resumes. You will be given keywords. Your job is to take the given bullet point and rewrite it to include relevant keywords.";
         let userPrompt = `Keywords: ${keywordsToAdd.join(", ")}\nBullet Point: ${originalBullet}\n`;
-        // console.log(userPrompt);
         do {
             count++;
             if (count % 5 == 0) {
@@ -194,12 +192,11 @@ async function autoBulletRewrite(originalBullet, keywordsToAdd) {
                 const wordsToAdd = Math.ceil(belowTarget / 5);
                 systemPrompt = `You are a job application assistant used for resumes. You need to rewrite this bullet point to be longer by ${wordsToAdd} word(s)`;
             }
-            // console.log(systemPrompt);
             userPrompt = `Keywords: ${keywordsToAdd.join(", ")}\nBullet Point: ${newBulletPoint}\n`;
 
-
         } while (newBulletPoint.length > 150 || newBulletPoint.length < 130);
-    } while (count < 50 && (newBulletPoint.length > 150 || newBulletPoint.length < 130))
+    } while (count < 50 && (newBulletPoint.length > 150 || newBulletPoint.length < 130));
+
     if (newBulletPoint.length > 150 || newBulletPoint.length < 130) {
         alert("Error, please try again");
         return;
@@ -214,8 +211,12 @@ async function autoBulletRewrite(originalBullet, keywordsToAdd) {
     if (newBulletPoint.startsWith("- ")) {
         newBulletPoint = newBulletPoint.slice(2);
     }
+    if (newBulletPoint.startsWith("Revised Bullet Point: ")) {
+        newBulletPoint = newBulletPoint.slice(22);
+    }
 
     let professionalDetails = JSON.parse(localStorage.getItem("aiSelectedProfessionalDetails")) || [];
+    let experienceDetails = JSON.parse(localStorage.getItem("aiSelectedExperienceDetails")) || [];
 
     let type;
     if (professionalDetails.some(detail => detail.bulletPoints.includes(originalBullet))) {
@@ -224,22 +225,25 @@ async function autoBulletRewrite(originalBullet, keywordsToAdd) {
         type = "experience";
     }
 
-    let storageKey = type === "professional" ? "aiSelectedProfessionalDetails" : "aiSelectedExperienceDetails";
-    let storedDetails = JSON.parse(localStorage.getItem(storageKey)) || [];
+    let storedDetails = type === "professional" ? professionalDetails : experienceDetails;
 
     outer:
     for (let i = 0; i < storedDetails.length; i++) {
         for (let j = 0; j < storedDetails[i].bulletPoints.length; j++) {
             if (storedDetails[i].bulletPoints[j] === originalBullet) {
                 storedDetails[i].bulletPoints[j] = newBulletPoint;
-                localStorage.setItem(storageKey, JSON.stringify(storedDetails));
                 break outer;
             }
         }
     }
-    
+
+    if (type === "professional") {
+        localStorage.setItem("aiSelectedProfessionalDetails", JSON.stringify(professionalDetails));
+    } else {
+        localStorage.setItem("aiSelectedExperienceDetails", JSON.stringify(experienceDetails));
+    }
+
     console.log(count + " tries. Success! " + newBulletPoint);
-    //showAIExperiences();
 }
 
 
@@ -253,7 +257,7 @@ function editBulletPoint(type, detailIndex, bulletIndex) {
     if (newBulletPoint !== null) {
         detail.bulletPoints[bulletIndex] = newBulletPoint;
         localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
-        //showAIExperiences();
+        showAIExperiences(false, true);
     }
 }
 
@@ -298,8 +302,11 @@ async function rewriteBulletPoint(type, detailIndex, bulletIndex) {
     if (newBulletPoint.startsWith("- ")) {
         newBulletPoint = newBulletPoint.slice(2);
     }
+    if (newBulletPoint.startsWith("Revised Bullet Point: ")) {
+        newBulletPoint = newBulletPoint.slice(22);
+    }
 
     detail.bulletPoints[bulletIndex] = newBulletPoint;
     localStorage.setItem(`aiSelected${type.charAt(0).toUpperCase() + type.slice(1)}`, JSON.stringify(allDetails));
-    //showAIExperiences();
+    showAIExperiences(false, true);
 }
