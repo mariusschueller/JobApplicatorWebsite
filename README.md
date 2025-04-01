@@ -1,18 +1,6 @@
 # AI Job Application Builder
 
-AI Job Application Builder is a web platform designed to help job seekers create professional resumes and cover letters effortlessly using artificial intelligence. This application streamlines the job application process by generating tailored documents based on user inputs and industry best practices.
-
-## Table of Contents
-
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Configuration](#configuration)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
-- [Acknowledgments](#acknowledgments)
+AI Job Application Builder is a web platform designed to help job seekers create professional resumes and cover letters effortlessly using artificial intelligence. This application takes the job description, and matches your experiences to the job and adds relevant keywords to your resume.
 
 ## Features
 
